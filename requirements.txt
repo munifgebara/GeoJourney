@@ -1,1 +1,26 @@
-# requirements.txt
+# Manipulação de arquivos e EXIF
+exiftool-wrapper
+pyexiftool
+pathlib
+
+
+
+# Tipagem e utilitários
+typing-extensions
+tqdm
+
+# (Futuramente) Processamento de imagem e vídeo
+opencv-python
+moviepy
+Pillow
+
+# (Futuramente) Texto e narração
+transformers
+gTTS
+
+# (Futuramente) Geolocalização e mapas
+geopy
+folium
+
+# (Opcional) CLI e TUI
+rich
