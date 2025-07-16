@@ -1,0 +1,53 @@
+# Ambiente virtual
+.venv/
+env/
+ENV/
+venv/
+*.env
+
+# Arquivos Python compilados
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Arquivos de cache e relatórios
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+*.~lock.*
+
+# Testes
+.pytest_cache/
+.coverage
+nosetests.xml
+coverage.xml
+*.cover
+
+# Diretórios de dados e saída
+data/raw/
+data/processed/
+data/outputs/
+
+# Mapas e arquivos gerados
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.wav
+*.mp3
+*.aac
+
+# Ferramentas e IDEs
+.vscode/
+.idea/
+*.iml
+
+# Sistema
+.DS_Store
+Thumbs.db
