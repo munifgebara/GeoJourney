@@ -3,24 +3,25 @@ exiftool-wrapper
 pyexiftool
 pathlib
 
-
-
 # Tipagem e utilitários
 typing-extensions
 tqdm
 
-# (Futuramente) Processamento de imagem e vídeo
+# Processamento de imagem e vídeo
 opencv-python
-moviepy
+moviepy==1.0.3
+numpy<2.3.0
 Pillow
+pillow-heif  # suporte a imagens HEIC
+pyheif       # suporte alternativo a HEIC
 
-# (Futuramente) Texto e narração
+# Texto e narração
 transformers
 gTTS
 
-# (Futuramente) Geolocalização e mapas
+# Geolocalização e mapas
 geopy
 folium
 
-# (Opcional) CLI e TUI
+# CLI e TUI (opcional)
 rich
