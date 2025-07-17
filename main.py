@@ -27,6 +27,12 @@ def parse_args():
         default="1280x720",  # HD
         help="Resolution of the output video (e.g., 1920x1080, 1280x720)"
     )
+    parser.add_argument(
+        "--skip-n",
+        type=int,
+        default=1,
+        help="Processa apenas de N em N arquivos para acelerar (default=5)"
+    )
     return parser.parse_args()
 
 def main():
@@ -38,6 +44,6 @@ def main():
     media_files = list_media_with_gps(args.input)
     print(f"Found {len(media_files)} media files with GPS data:")
     output_video = args.output / "geojourney_preview.mp4"
-    create_slideshow(media_files, output_video, resolution=args.resolution)
+    create_slideshow(media_files, output_video, resolution=args.resolution, skip_n=args.skip_n)
 if __name__ == "__main__":
     main()
