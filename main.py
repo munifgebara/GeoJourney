@@ -1,6 +1,11 @@
 import argparse
 from pathlib import Path
 from ingest.media_importer import list_media_with_gps  # ajuste o caminho conforme sua estrutura
+from composer.slideshow_creator import create_slideshow
+
+import pillow_heif
+pillow_heif.register_heif_opener()
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="GeoJourney - Generate travel slideshow videos with narration and maps.")
@@ -32,8 +37,7 @@ def main():
 
     media_files = list_media_with_gps(args.input)
     print(f"Found {len(media_files)} media files with GPS data:")
-    for f in media_files:
-        print(f" - {f}")
-
+    output_video = args.output / "geojourney_preview.mp4"
+    create_slideshow(media_files, output_video, resolution=args.resolution)
 if __name__ == "__main__":
     main()
