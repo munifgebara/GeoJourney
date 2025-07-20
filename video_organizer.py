@@ -114,6 +114,4 @@ def organize_videos(source_folder, output_folder):
     print(f"Total skipped (metadata error): {skipped_metadata_error}")
     print(f"Total skipped (unexpected error): {skipped_unexpected_error}")
 
-# Example usage:
 
-organize_videos("/media/munif/munif/in", "/media/munif/munif/out")

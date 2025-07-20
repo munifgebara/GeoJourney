@@ -4,8 +4,8 @@ import sys
 
 
 def main():
-    DEFAULT_INPUT = "/media/munif/munif/in"
-    DEFAULT_OUTPUT = "/media/munif/munif/out"
+    DEFAULT_INPUT = "/media/munif/MunifTx2025/.tx/in"
+    DEFAULT_OUTPUT = "/media/munif/MunifTx2025/.tx/out"
 
     if len(sys.argv) == 3:
         input_folder = sys.argv[1]
@@ -15,11 +15,13 @@ def main():
         input_folder = DEFAULT_INPUT
         output_folder = DEFAULT_OUTPUT
 
-    print("--- Organizing PHOTOS ---")
-    organize_photos(input_folder, output_folder)
+   
     print("--- Organizing VIDEOS ---")
     organize_videos(input_folder, output_folder)
 
+    print("--- Organizing PHOTOS ---")
+    organize_photos(input_folder, output_folder)
+   
 
 if __name__ == "__main__":
     main()
