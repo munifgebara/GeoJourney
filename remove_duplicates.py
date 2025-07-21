@@ -12,20 +12,30 @@ from datetime import datetime
 
 def extract_hash_from_filename(filename):
     """
-    Extracts the hash from the filename, assuming format: <timestamp>_<hash>.<ext>
+    Extracts the hash from the filename, assuming format: <timestamp>_<hash>.<ext> or <timestamp>-<hash>.<ext>
     """
     name = Path(filename).stem
-    parts = name.split('_', 1)
+    if '_' in name:
+        parts = name.split('_', 1)
+    elif '-' in name:
+        parts = name.split('-', 1)
+    else:
+        parts = [name]
     if len(parts) == 2:
         return parts[1]
     return None
 
 def extract_timestamp_from_filename(filename):
     """
-    Extracts the timestamp from the filename, assuming format: <timestamp>_<hash>.<ext>
+    Extracts the timestamp from the filename, assuming format: <timestamp>_<hash>.<ext> or <timestamp>-<hash>.<ext>
     """
     name = Path(filename).stem
-    parts = name.split('_', 1)
+    if '_' in name:
+        parts = name.split('_', 1)
+    elif '-' in name:
+        parts = name.split('-', 1)
+    else:
+        parts = [name]
     if len(parts) == 2:
         return parts[0]
     return None
@@ -82,8 +92,8 @@ def remove_duplicate_files(root_folder, duplicated_folder):
 
 if __name__ == "__main__":
     import sys
-    DEFAULT_ROOT = "/srv/i7/.tx/out"
-    DEFAULT_DUPLICATES = "/srv/i7/.tx/duplicate"
+    DEFAULT_ROOT = "/mnt/7937a629-8811-4af0-ae7a-097a78cc4d2c/bkpSansung/out"
+    DEFAULT_DUPLICATES = "/mnt/7937a629-8811-4af0-ae7a-097a78cc4d2c/bkpSansung/duplicate"
 
     if len(sys.argv) == 1:
         print(f"[INFO] Using defaults: folder={DEFAULT_ROOT}, duplicates={DEFAULT_DUPLICATES}")
