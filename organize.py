@@ -6,8 +6,8 @@ import sys
 
 
 def main():
-    DEFAULT_INPUT = "/srv/i7/q/q"
-    DEFAULT_OUTPUT = "/srv/i7/.tx/out"
+    DEFAULT_INPUT = "/media/munif/munif/in"
+    DEFAULT_OUTPUT = "/media/munif/munif/out"
 
     if len(sys.argv) == 3:
         input_folder = sys.argv[1]

@@ -92,8 +92,8 @@ def remove_duplicate_files(root_folder, duplicated_folder):
 
 if __name__ == "__main__":
     import sys
-    DEFAULT_ROOT = "/mnt/7937a629-8811-4af0-ae7a-097a78cc4d2c/bkpSansung/out"
-    DEFAULT_DUPLICATES = "/mnt/7937a629-8811-4af0-ae7a-097a78cc4d2c/bkpSansung/duplicate"
+    DEFAULT_ROOT = "/media/munif/MunifTx2025/.tx/out"
+    DEFAULT_DUPLICATES = "/media/munif/MunifTx2025/.tx/duplicates"
 
     if len(sys.argv) == 1:
         print(f"[INFO] Using defaults: folder={DEFAULT_ROOT}, duplicates={DEFAULT_DUPLICATES}")
