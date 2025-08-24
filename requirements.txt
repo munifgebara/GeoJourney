@@ -27,3 +27,4 @@ chromedriver-autoinstaller
 
 # CLI e TUI (opcional)
 rich
+nudenet

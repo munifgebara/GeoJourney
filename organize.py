@@ -6,8 +6,8 @@ import sys
 
 
 def main():
-    DEFAULT_INPUT = "/media/munif/munif/in"
-    DEFAULT_OUTPUT = "/media/munif/munif/out"
+    DEFAULT_INPUT = "/home/munif/.tx/in"
+    DEFAULT_OUTPUT = "/home/munif/.tx/out"
 
     if len(sys.argv) == 3:
         input_folder = sys.argv[1]

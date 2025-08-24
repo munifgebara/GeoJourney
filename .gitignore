@@ -26,6 +26,7 @@ coverage.xml
 *.cover
 
 # Diretórios de dados e saída
+media_scan.sqlite
 data/raw/
 data/processed/
 data/outputs/
