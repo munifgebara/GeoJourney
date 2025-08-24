@@ -105,3 +105,7 @@ if __name__ == "__main__":
         remove_duplicate_files(sys.argv[1], sys.argv[2])
     else:
         print("Usage: python remove_duplicates.py [<folder> [<duplicates_folder>]]")
+
+
+
+# unison /mnt/7937a629-8811-4af0-ae7a-097a78cc4d2c/.tx    /media/munif/munif/.tx
