@@ -9,7 +9,7 @@ GROUP BY label
 ORDER BY qtd DESC
 LIMIT 10;
 """
-PARAMS = {}  # parâmetros nomeados, se precisar (ex.: {"minscore": 0.8})
+PARAMS = {}
 
 
 SQL = """
@@ -17,11 +17,12 @@ SELECT m.path, m.type, d.frame_time, d.box_x1, d.box_y1, d.box_x2, d.box_y2, d.s
 FROM detections d
 JOIN media m ON m.id = d.media_id
 WHERE d.score >= :minscore
+AND 
+
 ORDER BY d.score DESC
 LIMIT 50;
 """
 PARAMS = {"minscore": 0.85}
-
 
 
 
