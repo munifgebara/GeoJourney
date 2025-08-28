@@ -54,7 +54,7 @@ except Exception:
 # Configurações básicas
 # -------------------------------
 
-DEFAULT_ROOT = "/home/munif/.tx/tx"
+DEFAULT_ROOT = "/media/munif/DADOSMUNIF/out"
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".webp"}
 VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v"}
 
@@ -481,7 +481,7 @@ def build_argparser():
         default=DEFAULT_ROOT,
         help=f"Pasta raiz a escanear (default: {DEFAULT_ROOT})"
     )
-    ps.add_argument("--db", default="media_scan.sqlite", help="Arquivo SQLite (default: media_scan.sqlite)")
+    ps.add_argument("--db", default=DEFAULT_ROOT+"/media_scan.sqlite", help="Arquivo SQLite (default: media_scan.sqlite)")
     ps.add_argument("--video-interval", type=float, default=1.0, help="Intervalo (s) entre frames no vídeo (default: 1.0s)")
     ps.set_defaults(func=cmd_scan)
 
