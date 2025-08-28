@@ -300,7 +300,6 @@ def analyze_image(detector: NudeNetWrapper, path: Path, ignored: set) -> List[Tu
         if label and label in ignored:
             continue
 
-        print (label)
         rows.append((None,
                      None,
                      int(box[0]) if box[0] is not None else None,
@@ -343,7 +342,6 @@ def analyze_video(detector: NudeNetWrapper, path: Path, interval_s: float, ignor
                 if label and label in ignored:
                     continue
 
-                print(label)
                 rows.append((None,
                              float(t),
                              int(box[0]) if box[0] is not None else None,
@@ -437,7 +435,8 @@ def cmd_scan(args):
             db.insert_detections(media_id, rows)
 
         new_or_updated += 1
-        print(f"[OK] {media_type.upper()} analisado: {path} ({len(det_rows)} detecções)")
+        if (len(det_rows)>0):
+           print(f"{path}")
 
     print(f"\nResumo: analisados/atualizados={new_or_updated}, pulados={skipped}, total_encontrados={total_files}")
     print(f"DB: {db_path}")
