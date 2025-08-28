@@ -2,27 +2,34 @@
 """
 scan.py
 ---------------------------------
-Projeto Python para escanear pastas de fotos e vídeos, rodar NudeNet (GPU se disponível)
-e armazenar resultados em um banco de dados SQLite (sem instalar nada extra).
+Scanner de fotos/vídeos usando NudeNet + SQLite.
+Atende aos requisitos:
+- Varre diretório recursivamente (imagens e vídeos)
+- Usa NudeNet (GPU se TF-GPU estiver instalado)
+- Banco de dados SQLite (stdlib, sem instalar nada extra)
+- Incremental (só reanalisa se arquivo mudou)
+- **DB padrão é criado/aberto em <root>/media_scan.sqlite**
+- Suporte a **lista de labels ignoradas** (default inclui "FEET_COVERED")
 
 Requisitos:
     pip install nudenet opencv-python
-    # NudeNet depende de TensorFlow.
-    # Para GPU, instale separadamente a versão com suporte a GPU do TensorFlow.
-    # Ex.: pip install tensorflow-gpu  (ou conforme instruções da sua GPU/TF)
+    # Instale também TensorFlow (CPU ou GPU) conforme sua máquina.
 
-Uso (exemplos):
-    # Usa todos os defaults solicitados:
-    # root default: /run/user/1000/gvfs/smb-share:server=munif-i7.local,share=i7/i5/tx
-    # --db default: media_scan.sqlite
-    # --video-interval default: 1.0
+Uso:
+    # Sem argumentos -> usa 'scan' com defaults
+    python scan.py
+
+    # Scan explícito (root default abaixo) e DB default <root>/media_scan.sqlite
     python scan.py scan
 
-    # Personalizando somente o root:
-    python scan.py scan /outro/caminho
+    # Informando outro root e adicionando labels a ignorar
+    python scan.py scan /minhas/midias --ignore-label HAND --ignore-label ELBOW
 
-    # Listando:
-    python scan.py list --label F_BREAST --min-score 0.7
+    # Listar detecções (filtro opcional)
+    python scan.py list --label F_BREAST --min-score 0.8
+
+    # Ver mídias registradas
+    python scan.py show-media --limit 20
 """
 
 import argparse
@@ -36,20 +43,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
 
-# Dependências opcionais de execução (instale via pip)
-# - NudeNet para detecção
-# - OpenCV para ler frames de vídeo
-try:
-    from nudenet import NudeDetector
-except Exception as e:
-    NudeDetector = None  # tratamos mais abaixo
-
-try:
-    import cv2
-except Exception:
-    cv2 = None  # tratamos mais abaixo
-
-
 # -------------------------------
 # Configurações básicas
 # -------------------------------
@@ -57,6 +50,35 @@ except Exception:
 DEFAULT_ROOT = "/media/munif/DADOSMUNIF/out"
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".webp"}
 VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v"}
+
+# Labels para ignorar por padrão
+IGNORED_LABELS_DEFAULT = {
+    "FEET_COVERED",
+    "FEET_EXPOSED",
+    "FACE_FEMALE",
+    "FACE_MALE",
+    "FEMALE_BREAST_COVERED",
+    "MALE_BREAST_COVERED",
+    "MALE_BREAST_EXPOSED",
+    "BELLY_COVERED",
+    "BELLY_EXPOSED",
+    "ARMPITS_COVERED",
+    "ARMPITS_EXPOSED"
+}
+
+# -------------------------------
+# Dependências opcionais (em runtime)
+# -------------------------------
+try:
+    from nudenet import NudeDetector
+except Exception:
+    NudeDetector = None
+
+try:
+    import cv2
+except Exception:
+    cv2 = None
+
 
 # -------------------------------
 # Utilitários
@@ -147,7 +169,6 @@ class DB:
         duration: Optional[float],
     ) -> int:
         with self.connect() as conn:
-            # Tenta inserir; em conflito de path, atualiza tudo (inclusive hash e analyzed_at)
             cur = conn.execute(
                 """
                 INSERT INTO media (path, sha256, size_bytes, mtime, type, width, height, duration, analyzed_at)
@@ -169,7 +190,6 @@ class DB:
             )
             media_id = cur.lastrowid
             if media_id == 0:
-                # Em UPDATE, lastrowid pode ser 0 — vamos buscar o id
                 cur = conn.execute("SELECT id FROM media WHERE path = ?", (str(path),))
                 row = cur.fetchone()
                 media_id = row[0]
@@ -180,7 +200,6 @@ class DB:
             conn.execute("DELETE FROM detections WHERE media_id = ?", (media_id,))
 
     def insert_detections(self, media_id: int, rows: List[Tuple]):
-        # rows: (media_id, frame_time, x1, y1, x2, y2, score, label)
         with self.connect() as conn:
             conn.executemany(
                 """
@@ -201,7 +220,7 @@ class NudeNetWrapper:
         if NudeDetector is None:
             raise RuntimeError(
                 "NudeNet não encontrado. Instale com: pip install nudenet\n"
-                "Lembre-se de instalar TensorFlow separadamente (com ou sem GPU)."
+                "E lembre-se do TensorFlow (CPU ou GPU)."
             )
         self.detector = NudeDetector()
 
@@ -212,6 +231,7 @@ class NudeNetWrapper:
         try:
             return self.detector.detect(bgr_image)
         except Exception:
+            # fallback via arquivo temporário
             import tempfile
             import cv2 as _cv2
             fd, tmp = tempfile.mkstemp(suffix=".jpg")
@@ -227,7 +247,7 @@ class NudeNetWrapper:
 
 
 # -------------------------------
-# Varredura de Mídia
+# Varredura / Análise
 # -------------------------------
 
 def scan_paths(root: Path) -> Iterable[Path]:
@@ -269,16 +289,20 @@ def get_video_meta(path: Path) -> Tuple[Optional[int], Optional[int], Optional[f
         cap.release()
 
 
-def analyze_image(detector: NudeNetWrapper, path: Path) -> List[Tuple]:
+def analyze_image(detector: NudeNetWrapper, path: Path, ignored: set) -> List[Tuple]:
     detections = detector.detect_image_path(path)
-    rows = []
+    rows: List[Tuple] = []
     for d in detections:
         box = d.get("box") or [None, None, None, None]
         score = float(d.get("score", 0.0))
-        label = str(d.get("class", ""))
-        print (f"Label: {label}")
-        rows.append((None,  # media_id preenchido depois
-                     None,  # frame_time (imagens não possuem)
+        raw_label = d.get("label") or d.get("class") or d.get("name") or d.get("title") or ""
+        label = str(raw_label).upper()
+        if label and label in ignored:
+            continue
+
+        print (label)
+        rows.append((None,
+                     None,
                      int(box[0]) if box[0] is not None else None,
                      int(box[1]) if box[1] is not None else None,
                      int(box[2]) if box[2] is not None else None,
@@ -287,7 +311,7 @@ def analyze_image(detector: NudeNetWrapper, path: Path) -> List[Tuple]:
     return rows
 
 
-def analyze_video(detector: NudeNetWrapper, path: Path, interval_s: float) -> List[Tuple]:
+def analyze_video(detector: NudeNetWrapper, path: Path, interval_s: float, ignored: set) -> List[Tuple]:
     if cv2 is None:
         raise RuntimeError("OpenCV não está instalado. Instale com: pip install opencv-python")
 
@@ -314,8 +338,12 @@ def analyze_video(detector: NudeNetWrapper, path: Path, interval_s: float) -> Li
             for d in dets:
                 box = d.get("box") or [None, None, None, None]
                 score = float(d.get("score", 0.0))
-                label = str(d.get("class", ""))
-                print(f"Label: {label}")
+                raw_label = d.get("label") or d.get("class") or d.get("name") or d.get("title") or ""
+                label = str(raw_label).upper()
+                if label and label in ignored:
+                    continue
+
+                print(label)
                 rows.append((None,
                              float(t),
                              int(box[0]) if box[0] is not None else None,
@@ -338,19 +366,30 @@ def needs_reanalysis(db: DB, path: Path, sha: str, size: int, mtime: float) -> b
     return (sha_db != sha) or (size_db != size) or (abs(mtime_db - mtime) > 1e-6)
 
 
+# -------------------------------
+# Comandos
+# -------------------------------
+
 def cmd_scan(args):
     root = Path(args.root).expanduser().resolve()
     if not root.exists():
         print(f"[ERRO] Pasta não existe: {root}", file=sys.stderr)
         sys.exit(2)
 
-    db = DB(Path(args.db).expanduser().resolve())
+    # Define o DB: se não passar --db, usa <root>/media_scan.sqlite
+    db_path = Path(args.db).expanduser().resolve() if args.db else (root / "media_scan.sqlite")
+    db = DB(db_path)
     db.ensure_schema()
 
     if NudeDetector is None:
         print("[ERRO] NudeNet não instalado. Rode: pip install nudenet", file=sys.stderr)
         sys.exit(3)
     detector = NudeNetWrapper()
+
+    # Conjunto de labels ignoradas
+    ignored = set(s.upper() for s in IGNORED_LABELS_DEFAULT)
+    if getattr(args, "ignore_label", None):
+        ignored.update(s.upper() for s in args.ignore_label)
 
     total_files = 0
     new_or_updated = 0
@@ -373,10 +412,10 @@ def cmd_scan(args):
         try:
             if media_type == "image":
                 width, height = get_image_size(path)
-                det_rows = analyze_image(detector, path)
+                det_rows = analyze_image(detector, path, ignored)
             else:
                 width, height, duration = get_video_meta(path)
-                det_rows = analyze_video(detector, path, args.video_interval)
+                det_rows = analyze_video(detector, path, args.video_interval, ignored)
         except Exception as e:
             print(f"[WARN] Falha ao analisar {path}: {e}", file=sys.stderr)
             continue
@@ -401,12 +440,13 @@ def cmd_scan(args):
         print(f"[OK] {media_type.upper()} analisado: {path} ({len(det_rows)} detecções)")
 
     print(f"\nResumo: analisados/atualizados={new_or_updated}, pulados={skipped}, total_encontrados={total_files}")
+    print(f"DB: {db_path}")
 
 
 def cmd_list(args):
-    db = DB(Path(args.db).expanduser().resolve())
-    if not db.path.exists():
-        print(f"[ERRO] Banco inexistente: {db.path}", file=sys.stderr)
+    db_path = Path(args.db).expanduser().resolve()
+    if not db_path.exists():
+        print(f"[ERRO] Banco inexistente: {db_path}", file=sys.stderr)
         sys.exit(2)
 
     sql = """
@@ -419,7 +459,7 @@ def cmd_list(args):
 
     if args.label:
         sql += " AND d.label = ?"
-        params.append(args.label)
+        params.append(args.label.upper())
     if args.min_score is not None:
         sql += " AND d.score >= ?"
         params.append(float(args.min_score))
@@ -430,7 +470,7 @@ def cmd_list(args):
     sql += " ORDER BY d.score DESC LIMIT ?"
     params.append(int(args.limit))
 
-    with db.connect() as conn:
+    with sqlite3.connect(db_path) as conn:
         cur = conn.execute(sql, tuple(params))
         rows = cur.fetchall()
 
@@ -449,10 +489,11 @@ def cmd_list(args):
         }
         print(json.dumps(record, ensure_ascii=False))
 
+
 def cmd_show_media(args):
-    db = DB(Path(args.db).expanduser().resolve())
-    if not db.path.exists():
-        print(f"[ERRO] Banco inexistente: {db.path}", file=sys.stderr)
+    db_path = Path(args.db).expanduser().resolve()
+    if not db_path.exists():
+        print(f"[ERRO] Banco inexistente: {db_path}", file=sys.stderr)
         sys.exit(2)
 
     sql = """
@@ -461,7 +502,7 @@ def cmd_show_media(args):
     ORDER BY analyzed_at DESC
     LIMIT ?
     """
-    with db.connect() as conn:
+    with sqlite3.connect(db_path) as conn:
         cur = conn.execute(sql, (int(args.limit),))
         rows = cur.fetchall()
 
@@ -469,9 +510,14 @@ def cmd_show_media(args):
         print(f"[{mid}] {mtype.upper()} {path}")
         print(f"    size: {w}x{h}  duration: {dur if dur is not None else '-'}  analyzed_at: {human_ts(ts)}")
 
+
+# -------------------------------
+# CLI
+# -------------------------------
+
 def build_argparser():
     p = argparse.ArgumentParser(description="Scanner de fotos/vídeos com NudeNet + SQLite")
-    sub = p.add_subparsers(dest="cmd")  # default: not required; we will default to 'scan'
+    sub = p.add_subparsers(dest="cmd")  # não-required; default será 'scan'
 
     # scan
     ps = sub.add_parser("scan", help="Escanear diretório e atualizar banco")
@@ -481,14 +527,15 @@ def build_argparser():
         default=DEFAULT_ROOT,
         help=f"Pasta raiz a escanear (default: {DEFAULT_ROOT})"
     )
-    ps.add_argument("--db", default=DEFAULT_ROOT+"/media_scan.sqlite", help="Arquivo SQLite (default: media_scan.sqlite)")
+    ps.add_argument("--db", default=None, help="Arquivo SQLite; default: <root>/media_scan.sqlite")
     ps.add_argument("--video-interval", type=float, default=1.0, help="Intervalo (s) entre frames no vídeo (default: 1.0s)")
+    ps.add_argument("--ignore-label", action="append", default=[], help="Adicionar rótulos a ignorar (pode repetir)")
     ps.set_defaults(func=cmd_scan)
 
     # list
     pl = sub.add_parser("list", help="Listar detecções filtrando por label/score")
-    pl.add_argument("--db", default="media_scan.sqlite")
-    pl.add_argument("--label", help="Rótulo exato (ex.: F_BREAST, BELLY, etc.)")
+    pl.add_argument("--db", required=True, help="Caminho do arquivo SQLite")
+    pl.add_argument("--label", help="Rótulo exato (será uppercased)")
     pl.add_argument("--min-score", type=float, default=None, help="Pontuação mínima (ex.: 0.7)")
     pl.add_argument("--type", choices=["image","video"], help="Filtrar pelo tipo de mídia")
     pl.add_argument("--limit", type=int, default=100, help="Máximo de linhas (default: 100)")
@@ -496,7 +543,7 @@ def build_argparser():
 
     # show-media
     pm = sub.add_parser("show-media", help="Mostrar resumo das mídias no banco")
-    pm.add_argument("--db", default="media_scan.sqlite")
+    pm.add_argument("--db", required=True, help="Caminho do arquivo SQLite")
     pm.add_argument("--limit", type=int, default=50)
     pm.set_defaults(func=cmd_show_media)
 
@@ -506,10 +553,10 @@ def build_argparser():
 def main():
     parser = build_argparser()
     args = parser.parse_args()
-    # Se nenhum subcomando for informado, usar 'scan' com defaults
-    if not hasattr(args, 'func'):
+    # default para 'scan' se nenhum subcomando informado
+    if not hasattr(args, "func"):
         from argparse import Namespace
-        args = Namespace(cmd='scan', root=DEFAULT_ROOT, db='media_scan.sqlite', video_interval=1.0)
+        args = Namespace(cmd="scan", root=DEFAULT_ROOT, db=None, video_interval=1.0, ignore_label=[])
         return cmd_scan(args)
     args.func(args)
 
